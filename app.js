@@ -1,18 +1,61 @@
 // ============================================================
-// CSV Data Storage
+// CSV/Wix Data Storage
 // ============================================================
 let mockCollectionData = [];
 let originalData = [];
 let filteredData = [];
 let activeFilters = {};
 let activeSort = { column: null, direction: null };
-let csvHeaders = []; // Store CSV column headers
+let csvHeaders = []; // Store column headers
+
 const filterableColumns = ['endDate', 'plrName', 'trnName', 'year', 'FinalPosition', 'TournPurse'];
 
-// Dropdown state (NEW)
+// Dropdown state
 let gOpenDropdown = null;
 let gOpenButton = null;
 let gRepositionHandler = null;
+
+// ============================================================
+// CONFIG: Wix endpoint (Import731)
+// ============================================================
+const WIX_BASE_URL = "https://allworldgolf.com";
+const WIX_IMPORT731_ENDPOINT = `${WIX_BASE_URL}/_functions/import731?limit=1000`;
+
+// ============================================================
+// Helpers
+// ============================================================
+function normalizeWixItems(items) {
+    // Ensure each item has _id, and remove Wix system fields you don't want shown
+    return (items || []).map((item, idx) => {
+        const row = { ...item };
+
+        // Ensure _id exists
+        if (!row._id) row._id = item._id || String(idx + 1);
+
+        // Remove common Wix system fields (optional)
+        delete row._owner;
+        delete row._createdDate;
+        delete row._updatedDate;
+
+        return row;
+    });
+}
+
+function setHeadersFromData(data) {
+    if (!data || data.length === 0) {
+        console.warn("No data available to infer headers.");
+        csvHeaders = ['plrName', 'trnName', 'FinalPosition', 'TournPurse', 'year'];
+        return;
+    }
+
+    // Use keys from first row, keep _id first if present
+    const keys = Object.keys(data[0]);
+    if (keys.includes('_id')) {
+        csvHeaders = ['_id', ...keys.filter(k => k !== '_id')];
+    } else {
+        csvHeaders = keys;
+    }
+}
 
 // Parse CSV line handling quoted values
 function parseCSVLine(line) {
@@ -38,7 +81,22 @@ function parseCSVLine(line) {
 }
 
 // ============================================================
-// Load CSV Data
+// Load from Wix Collection (Import731)
+// ============================================================
+async function loadWixImport731Data() {
+    const res = await fetch(WIX_IMPORT731_ENDPOINT, { method: 'GET' });
+    if (!res.ok) {
+        throw new Error(`Wix Import731 endpoint failed: HTTP ${res.status}`);
+    }
+
+    const payload = await res.json();
+    const items = normalizeWixItems(payload.items || []);
+    console.log("Loaded Import731 from Wix:", items.length, "rows");
+    return items;
+}
+
+// ============================================================
+// Load CSV Data (fallback)
 // ============================================================
 async function loadCSVData() {
     try {
@@ -96,34 +154,48 @@ async function loadCSVData() {
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        console.log('Loading CSV data...');
-        mockCollectionData = await loadCSVData();
-        console.log('CSV loaded:', mockCollectionData.length, 'rows');
-        console.log('CSV headers:', csvHeaders);
+        const tableLoading = document.getElementById('tableLoading');
+        const tableWrapper = document.getElementById('tableWrapper');
 
-        if (mockCollectionData.length === 0) {
-            console.error('No data loaded from CSV');
-            return;
+        // Ensure sticky headers can work
+        ensureWrapperScroll(tableWrapper);
+
+        // 1) Prefer Wix Import731
+        // 2) Fall back to CSV if Wix isn't ready / CORS blocked
+        try {
+            console.log('Loading Wix Import731 data...');
+            mockCollectionData = await loadWixImport731Data();
+            if (!mockCollectionData || mockCollectionData.length === 0) {
+                throw new Error("Wix returned 0 rows.");
+            }
+            setHeadersFromData(mockCollectionData);
+        } catch (wixErr) {
+            console.warn('Wix load failed (will fall back to CSV):', wixErr);
+            console.log('Loading CSV data...');
+            mockCollectionData = await loadCSVData();
+
+            if (!mockCollectionData || mockCollectionData.length === 0) {
+                throw new Error('No data loaded from Wix or CSV fallback.');
+            }
+
+            // CSV loader already sets csvHeaders, but if it didn't:
+            if (!csvHeaders || csvHeaders.length === 0) setHeadersFromData(mockCollectionData);
         }
+
+        console.log('Loaded rows:', mockCollectionData.length);
+        console.log('Headers:', csvHeaders);
 
         originalData = [...mockCollectionData];
         filteredData = [...mockCollectionData];
 
-        const tableLoading = document.getElementById('tableLoading');
-        const tableWrapper = document.getElementById('tableWrapper');
-
-        // NEW: ensure sticky headers can work
-        ensureWrapperScroll(tableWrapper);
-
         generateTableHeaders();
-        applyStickyHeaderStyles(); // NEW: sticky header + preserve background
+        applyStickyHeaderStyles();
         setupTableFilters();
         setupClearAllFiltersButton();
 
         loadTableData().then(() => {
             if (tableLoading) tableLoading.classList.add('hidden');
             if (tableWrapper) tableWrapper.style.display = 'block';
-            // Re-apply sticky header styles after data loads
             applyStickyHeaderStyles();
         }).catch(error => {
             console.error('Error loading table:', error);
@@ -144,16 +216,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ============================================================
-// NEW: Make sticky headers work without forcing ugly styles
+// Make sticky headers work without forcing ugly styles
 // ============================================================
 function ensureWrapperScroll(wrapper) {
     if (!wrapper) return;
 
-    // Sticky headers work inside a scroll container.
-    // Ensure wrapper has overflow-y:auto and position:relative for sticky to work
     const cs = window.getComputedStyle(wrapper);
 
-    // Ensure overflow-y is auto (not visible) for sticky positioning to work
     if (cs.overflowY === 'visible') {
         wrapper.style.overflowY = 'auto';
     }
@@ -161,7 +230,6 @@ function ensureWrapperScroll(wrapper) {
         wrapper.style.position = 'relative';
     }
 
-    // Set max-height if not already set in CSS
     if ((cs.maxHeight === 'none' || cs.maxHeight === '') && (cs.height === 'auto' || cs.height === '0px')) {
         wrapper.style.maxHeight = 'calc(100vh - 450px)';
     }
@@ -175,14 +243,12 @@ function applyStickyHeaderStyles() {
     const ths = table.querySelectorAll('thead th');
     if (!thead || !ths.length) return;
 
-    // Set thead to sticky with transparent background
     thead.style.position = 'sticky';
     thead.style.top = '0px';
     thead.style.zIndex = '100';
     thead.style.background = 'transparent';
     thead.style.backgroundColor = 'transparent';
 
-    // Ensure thead tr has sticky positioning but NO background
     const theadTr = thead.querySelector('tr');
     if (theadTr) {
         theadTr.style.position = 'sticky';
@@ -193,34 +259,28 @@ function applyStickyHeaderStyles() {
         theadTr.style.backdropFilter = 'none';
     }
 
-    // CRITICAL: Apply background directly to each th element (the sticky element)
-    // This is the ONLY place the background should be
     ths.forEach(th => {
-        // Apply sticky positioning first
         th.style.position = 'sticky';
         th.style.top = '0px';
         th.style.zIndex = '100';
-        
-        // Apply background with maximum priority - use darker, slightly transparent background
+
         th.style.setProperty('background', 'rgba(45, 45, 68, 0.85)', 'important');
         th.style.setProperty('background-color', 'rgba(45, 45, 68, 0.85)', 'important');
         th.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
         th.style.setProperty('transform', 'translateZ(0)', 'important');
         th.style.setProperty('-webkit-backface-visibility', 'hidden', 'important');
         th.style.setProperty('backface-visibility', 'hidden', 'important');
-        
-        // Ensure isolation for proper stacking
+
         th.style.isolation = 'isolate';
     });
-    
-    // Force a reflow to ensure styles are applied
+
     requestAnimationFrame(() => {
-        table.offsetHeight; // Force reflow
+        table.offsetHeight;
     });
 }
 
 // ============================================================
-// Setup API key input (unchanged)
+// API key input (unchanged)
 // ============================================================
 function setupApiKeyInput() {
     const toggleBtn = document.getElementById('toggleApiKey');
@@ -256,7 +316,7 @@ function setupApiKeyInput() {
 }
 
 // ============================================================
-// Generate table headers dynamically from CSV
+// Generate table headers dynamically
 // ============================================================
 function generateTableHeaders() {
     const thead = document.querySelector('#collectionTable thead tr');
@@ -266,7 +326,7 @@ function generateTableHeaders() {
     }
 
     if (csvHeaders.length === 0) {
-        console.warn('No CSV headers found. Using default headers.');
+        console.warn('No headers found. Using default headers.');
         csvHeaders = ['plrName', 'trnName', 'FinalPosition', 'TournPurse', 'year'];
     }
 
@@ -312,7 +372,7 @@ function generateTableHeaders() {
 }
 
 // ============================================================
-// Load collection data into table
+// Load data into table
 // ============================================================
 function loadTableData(data = filteredData, adjustWidths = true) {
     return new Promise((resolve) => {
@@ -376,12 +436,10 @@ function loadTableData(data = filteredData, adjustWidths = true) {
             if (adjustWidths) {
                 setTimeout(() => {
                     autoAdjustColumnWidths();
-                    // Re-apply sticky header styles after width adjustment
                     applyStickyHeaderStyles();
                     resolve();
                 }, 0);
             } else {
-                // Re-apply sticky header styles even when not adjusting widths
                 applyStickyHeaderStyles();
                 resolve();
             }
@@ -452,7 +510,7 @@ function autoAdjustColumnWidths() {
 }
 
 // ============================================================
-// Floating dropdown helpers (NEW)
+// Floating dropdown helpers
 // ============================================================
 function detachDropdownToBody(dropdown) {
     if (!dropdown) return;
@@ -486,7 +544,7 @@ function positionDropdown(dropdown, button) {
     detachDropdownToBody(dropdown);
 
     dropdown.style.display = 'block';
-    dropdown.style.visibility = 'hidden'; // measure safely
+    dropdown.style.visibility = 'hidden';
 
     const thRect = th.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
@@ -498,16 +556,13 @@ function positionDropdown(dropdown, button) {
     let top = thRect.bottom;
     let left = thRect.left;
 
-    // Place above if needed
     if (top + dropdownHeight > viewportHeight && thRect.top > dropdownHeight) {
         top = thRect.top - dropdownHeight;
     }
 
-    // Clamp horizontally
     if (left + dropdownWidth > viewportWidth) left = viewportWidth - dropdownWidth - 12;
     if (left < 12) left = 12;
 
-    // Clamp vertically / maxHeight
     if (top < 12) top = 12;
     const spaceBelow = viewportHeight - top - 12;
     if (dropdownHeight > spaceBelow) dropdown.style.maxHeight = `${spaceBelow}px`;
@@ -519,19 +574,17 @@ function positionDropdown(dropdown, button) {
 }
 
 // ============================================================
-// Setup table filters (UPDATED: toggle close + floating dropdown)
+// Setup table filters
 // ============================================================
 function setupTableFilters() {
     const filterButtons = document.querySelectorAll('.filter-btn');
     const filterDropdowns = document.querySelectorAll('.filter-dropdown');
 
-    // Populate options
     filterDropdowns.forEach(dropdown => {
         const column = dropdown.dataset.column;
         populateFilterOptions(column, dropdown);
     });
 
-    // Toggle dropdowns (UPDATED)
     filterButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -540,7 +593,6 @@ function setupTableFilters() {
             const dropdown = document.querySelector(`.filter-dropdown[data-column="${column}"]`);
             if (!dropdown) return;
 
-            // NEW: if clicking same button while open => close
             if (gOpenDropdown === dropdown && dropdown.classList.contains('active')) {
                 closeAllDropdowns();
                 return;
@@ -567,24 +619,20 @@ function setupTableFilters() {
         });
     });
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.filter-dropdown') && !e.target.closest('.filter-btn')) {
             closeAllDropdowns();
         }
     });
 
-    // Search input
     document.querySelectorAll('.filter-input').forEach(input => {
         input.addEventListener('input', (e) => {
             const dropdown = e.target.closest('.filter-dropdown');
-            const column = dropdown.dataset.column;
             const searchTerm = e.target.value.toLowerCase();
-            filterOptionsBySearch(column, dropdown, searchTerm);
+            filterOptionsBySearch(dropdown, searchTerm);
         });
     });
 
-    // Checkbox selection
     document.addEventListener('change', (e) => {
         if (e.target.type === 'checkbox' && e.target.classList.contains('filter-checkbox')) {
             const dropdown = e.target.closest('.filter-dropdown');
@@ -596,7 +644,6 @@ function setupTableFilters() {
         }
     });
 
-    // Sort buttons
     document.querySelectorAll('.sort-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const dropdown = e.target.closest('.filter-dropdown');
@@ -608,7 +655,6 @@ function setupTableFilters() {
         });
     });
 
-    // Clear filter buttons
     document.querySelectorAll('.clear-filter-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const dropdown = e.target.closest('.filter-dropdown');
@@ -620,7 +666,6 @@ function setupTableFilters() {
     });
 }
 
-// NEW: closes and reattaches dropdown
 function closeAllDropdowns() {
     document.querySelectorAll('.filter-dropdown.active').forEach(dd => {
         dd.classList.remove('active');
@@ -639,7 +684,6 @@ function closeAllDropdowns() {
     gRepositionHandler = null;
 }
 
-// Populate filter options
 function populateFilterOptions(column, dropdown) {
     const optionsContainer = dropdown.querySelector('.filter-options');
     const uniqueValues = getUniqueValues(column);
@@ -657,7 +701,6 @@ function populateFilterOptions(column, dropdown) {
     });
 }
 
-// Get unique values for a column
 function getUniqueValues(column) {
     const values = originalData.map(item => {
         if (column === '_id' || column === 'id') return item._id;
@@ -669,8 +712,7 @@ function getUniqueValues(column) {
     return [...new Set(values)].sort();
 }
 
-// Filter options by search term
-function filterOptionsBySearch(column, dropdown, searchTerm) {
+function filterOptionsBySearch(dropdown, searchTerm) {
     const options = dropdown.querySelectorAll('.filter-option');
     options.forEach(option => {
         const text = option.textContent.toLowerCase();
@@ -678,7 +720,6 @@ function filterOptionsBySearch(column, dropdown, searchTerm) {
     });
 }
 
-// Apply filter
 function applyFilter(column, value, checked) {
     if (!activeFilters[column]) activeFilters[column] = [];
 
@@ -702,13 +743,12 @@ function applyFilter(column, value, checked) {
         }
     });
 
-    if (activeSort.column) applySort(activeSort.column, activeSort.direction, false);
+    if (activeSort.column) applySort(activeSort.column, activeSort.direction);
     else loadTableData(filteredData, false);
-    
+
     updateClearAllButtonVisibility();
 }
 
-// Apply sort
 function applySort(column, direction) {
     activeSort = { column, direction };
 
@@ -733,7 +773,6 @@ function applySort(column, direction) {
     updateClearAllButtonVisibility();
 }
 
-// Update sort indicators on filter buttons
 function updateSortIndicators(column, direction) {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('sorted-asc', 'sorted-desc');
@@ -743,7 +782,6 @@ function updateSortIndicators(column, direction) {
     });
 }
 
-// Clear filter for a column
 function clearFilter(column) {
     delete activeFilters[column];
 
@@ -771,88 +809,54 @@ function clearFilter(column) {
         }
     });
 
-    if (activeSort.column) applySort(activeSort.column, activeSort.direction, false);
+    if (activeSort.column) applySort(activeSort.column, activeSort.direction);
     else loadTableData(filteredData, false);
-    
+
     updateClearAllButtonVisibility();
 }
 
-// Clear all filters and sorts
-function clearAllFilters() {
-    // Clear all active filters
-    activeFilters = {};
-    
-    // Clear all checkboxes and search inputs in all dropdowns
-    document.querySelectorAll('.filter-dropdown').forEach(dropdown => {
-        dropdown.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = false);
-        const searchInput = dropdown.querySelector('.filter-input');
-        if (searchInput) searchInput.value = '';
-    });
-    
-    // Clear sort
-    activeSort = { column: null, direction: null };
-    updateSortIndicators(null, null);
-    
-    // Reset to original data
-    filteredData = [...originalData];
-    loadTableData(filteredData, false);
-    
-    // Close any open dropdowns
-    closeAllDropdowns();
-    
-    updateClearAllButtonVisibility();
-}
-
-// Update Clear All Filters button visibility
 function updateClearAllButtonVisibility() {
     const clearAllBtn = document.getElementById('clearAllFiltersBtn');
     if (!clearAllBtn) return;
-    
+
     const hasFilters = Object.keys(activeFilters).length > 0 || activeSort.column !== null;
     clearAllBtn.style.opacity = hasFilters ? '1' : '0.5';
     clearAllBtn.style.pointerEvents = hasFilters ? 'auto' : 'none';
     clearAllBtn.disabled = !hasFilters;
 }
 
-// Setup Clear All Filters button
 function setupClearAllFiltersButton() {
     const clearAllBtn = document.getElementById('clearAllFiltersBtn');
     if (!clearAllBtn) return;
-    
+
     clearAllBtn.addEventListener('click', () => {
-        clearAllFilters();
+        // Clear all active filters
+        activeFilters = {};
+
+        // Clear all checkboxes and search inputs
+        document.querySelectorAll('.filter-dropdown').forEach(dropdown => {
+            dropdown.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = false);
+            const searchInput = dropdown.querySelector('.filter-input');
+            if (searchInput) searchInput.value = '';
+        });
+
+        // Clear sort
+        activeSort = { column: null, direction: null };
+        updateSortIndicators(null, null);
+
+        // Reset data
+        filteredData = [...originalData];
+        loadTableData(filteredData, false);
+
+        closeAllDropdowns();
+        updateClearAllButtonVisibility();
     });
-    
-    // Initial state
+
     updateClearAllButtonVisibility();
 }
 
-// Clear all filters and sorts
-function clearAllFilters() {
-    // Clear all active filters
-    activeFilters = {};
-    
-    // Clear all checkboxes and search inputs in all dropdowns
-    document.querySelectorAll('.filter-dropdown').forEach(dropdown => {
-        dropdown.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = false);
-        const searchInput = dropdown.querySelector('.filter-input');
-        if (searchInput) searchInput.value = '';
-    });
-    
-    // Clear sort
-    activeSort = { column: null, direction: null };
-    updateSortIndicators(null, null);
-    
-    // Reset to original data
-    filteredData = [...originalData];
-    loadTableData(filteredData, false);
-    
-    // Close any open dropdowns
-    closeAllDropdowns();
-}
-
 // ============================================================
-// Chat UI (kept from your file)
+// Chat UI
 // ============================================================
 function setupChat() {
     const chatInput = document.getElementById('chatInput');
@@ -918,9 +922,8 @@ function setupChat() {
 
 // ============================================================
 // YOUR EXISTING OpenAI / file_search code goes here
-// (Keep exactly what you had; don’t change it)
 // ============================================================
 async function callChatGPTAPI(userMessage) {
-    // Paste your existing file_search-based callChatGPTAPI here.
+    // You’ll replace this later with a Wix backend endpoint (recommended).
     return `callChatGPTAPI not pasted. User asked: ${userMessage}`;
 }
