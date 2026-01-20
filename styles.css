@@ -10,11 +10,19 @@ html, body {
     margin: 0;
     padding: 0;
     overflow-x: hidden;
+
+    /* ✅ Let Wix control the background behind the iframe */
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+
+    /* ✅ Remove the app’s own background so Wix shows through */
+    background: transparent !important;
+    background-color: transparent !important;
+
     min-height: 100vh;
     padding: 20px;
     color: #e0e0e0;
@@ -28,6 +36,9 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
+
+    /* ✅ Ensure wrapper does not paint its own background */
+    background: transparent;
 }
 
 h1 {
@@ -52,6 +63,9 @@ h2 {
     gap: 20px;
     flex: 1;
     min-height: 0;
+
+    /* ✅ Ensure no painted background */
+    background: transparent;
 }
 
 /* Table Container */
@@ -188,7 +202,6 @@ table thead tr,
 table tbody tr {
     display: table-row;
 }
-
 
 .table-wrapper::-webkit-scrollbar {
     width: 8px;
@@ -874,4 +887,3 @@ tbody tr:last-child td {
         height: 10px;
     }
 }
-
