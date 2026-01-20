@@ -44,16 +44,34 @@ function normalizeWixItems(items) {
 function setHeadersFromData(data) {
   if (!data || data.length === 0) {
     console.warn("No data available to infer headers.");
-    csvHeaders = ['plrName', 'trnName', 'FinalPosition', 'TournPurse', 'year'];
+    csvHeaders = [];
     return;
   }
 
-  // Exclude Wix/system fields from display
   const hiddenCols = new Set(['_id', '_owner', '_createdDate', '_updatedDate']);
+
+  // Start columns (only included if they actually exist in the data)
+  const priority = [
+    'endDate',
+    'trnName',
+    'year',
+    'plrName',
+    'FinalPosition',
+    'TournPurse',
+    'FIELDSIZE'
+  ];
 
   const keys = Object.keys(data[0]).filter(k => !hiddenCols.has(k));
 
-  csvHeaders = keys;
+  // 1) priority keys in your preferred order, but only if present
+  const ordered = priority.filter(k => keys.includes(k));
+
+  // 2) everything else alphabetical
+  const rest = keys
+    .filter(k => !ordered.includes(k))
+    .sort((a, b) => a.localeCompare(b));
+
+  csvHeaders = [...ordered, ...rest];
 }
 
 
