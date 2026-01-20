@@ -42,20 +42,20 @@ function normalizeWixItems(items) {
 }
 
 function setHeadersFromData(data) {
-    if (!data || data.length === 0) {
-        console.warn("No data available to infer headers.");
-        csvHeaders = ['plrName', 'trnName', 'FinalPosition', 'TournPurse', 'year'];
-        return;
-    }
+  if (!data || data.length === 0) {
+    console.warn("No data available to infer headers.");
+    csvHeaders = ['plrName', 'trnName', 'FinalPosition', 'TournPurse', 'year'];
+    return;
+  }
 
-    // Use keys from first row, keep _id first if present
-    const keys = Object.keys(data[0]);
-    if (keys.includes('_id')) {
-        csvHeaders = ['_id', ...keys.filter(k => k !== '_id')];
-    } else {
-        csvHeaders = keys;
-    }
+  // Exclude Wix/system fields from display
+  const hiddenCols = new Set(['_id', '_owner', '_createdDate', '_updatedDate']);
+
+  const keys = Object.keys(data[0]).filter(k => !hiddenCols.has(k));
+
+  csvHeaders = keys;
 }
+
 
 // Parse CSV line handling quoted values
 function parseCSVLine(line) {
