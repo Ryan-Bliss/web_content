@@ -41,6 +41,58 @@ function normalizeWixItems(items) {
     });
 }
 
+function smartStatSort(a, b) {
+  // Group & order fields like: drivingAccuracyPercentageLast4, Last12, Last24, Last50, Last100
+  const pa = parseLastMetric(a);
+  const pb = parseLastMetric(b);
+
+  // If both are "...Last<number>" metrics, group by base then sort by number
+  if (pa.isLastMetric && pb.isLastMetric) {
+    const baseCmp = pa.base.localeCompare(pb.base);
+    if (baseCmp !== 0) return baseCmp;
+
+    // same base metric -> sort by last number ascending
+    if (pa.lastNum !== pb.lastNum) return pa.lastNum - pb.lastNum;
+
+    // tie-breaker
+    return naturalCompare(a, b);
+  }
+
+  // If only one is a Last metric, you can choose whether they come first or just normal
+  // Here: keep non-last and last mixed alphabetically by base name (more predictable overall)
+  // If you want Last-metrics grouped after non-last fields, change return values below.
+  if (pa.isLastMetric && !pb.isLastMetric) {
+    // compare base vs full b (so metrics don't jump wildly)
+    const baseCmp = pa.base.localeCompare(pb.base);
+    return baseCmp !== 0 ? baseCmp : -1;
+  }
+  if (!pa.isLastMetric && pb.isLastMetric) {
+    const baseCmp = a.localeCompare(pb.base);
+    return baseCmp !== 0 ? baseCmp : 1;
+  }
+
+  // Neither is a Last metric -> natural sort (handles numbers embedded anywhere)
+  return naturalCompare(a, b);
+}
+
+function parseLastMetric(fieldName) {
+  // Matches "...Last4", "...Last12", "...Last100" (case-insensitive)
+  const m = fieldName.match(/^(.*)last(\d+)$/i);
+  if (!m) return { isLastMetric: false, base: fieldName, lastNum: Number.POSITIVE_INFINITY };
+
+  return {
+    isLastMetric: true,
+    base: m[1],                 // everything before "Last###"
+    lastNum: parseInt(m[2], 10) // numeric
+  };
+}
+
+function naturalCompare(a, b) {
+  // Natural sort: "foo2" < "foo10"
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+
 function setHeadersFromData(data) {
   if (!data || data.length === 0) {
     console.warn("No data available to infer headers.");
@@ -69,7 +121,7 @@ function setHeadersFromData(data) {
   // 2) everything else alphabetical
   const rest = keys
     .filter(k => !ordered.includes(k))
-    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    .sort((a, b) => smartStatSort(a, b));
 
   csvHeaders = [...ordered, ...rest];
 }
