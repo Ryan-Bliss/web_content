@@ -405,13 +405,21 @@ function generateTableHeaders() {
     thead.innerHTML = '';
 
     const numericColumns = ['FinalPosition', 'TournPurse', 'year', 'plrNum', 'T_ID'];
+    const dateColumns = ['endDate', 'startDate', 'date']; // add any others you use
 
     csvHeaders.forEach(header => {
         const th = document.createElement('th');
         const hasFilter = filterableColumns.includes(header);
-        const isNumeric = numericColumns.includes(header) || header.includes('Last') || header.includes('Percentage') || header.includes('Average');
-        const sortText = isNumeric ? 'Sort Low-High' : 'Sort A-Z';
-        const sortTextDesc = isNumeric ? 'Sort High-Low' : 'Sort Z-A';
+        const isDate = dateColumns.includes(header) || /date$/i.test(header) || /_date$/i.test(header);
+        const isNumeric = !isDate && (
+            numericColumns.includes(header) ||
+            header.includes('Last') ||
+            header.includes('Percentage') ||
+            header.includes('Average')
+        );
+        
+        const sortText = isDate ? 'Oldest → Newest' : (isNumeric ? 'Sort Low-High' : 'Sort A-Z');
+        const sortTextDesc = isDate ? 'Newest → Oldest' : (isNumeric ? 'Sort High-Low' : 'Sort Z-A');
 
         th.innerHTML = `
             <div class="th-content">
@@ -821,24 +829,64 @@ function applyFilter(column, value, checked) {
     updateClearAllButtonVisibility();
 }
 
+function parseDateToTime(value) {
+  if (value === null || value === undefined) return null;
+
+  const s = String(value).trim();
+  if (!s) return null;
+
+  // If your Wix field is stored like "2025-08-24" this will parse reliably
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.getTime();
+
+  // If you ever get weird formats, you can extend here
+  return null;
+}
+
+
 function applySort(column, direction) {
     activeSort = { column, direction };
 
     filteredData.sort((a, b) => {
-        const aNum = parseFloat(a[column]);
-        const bNum = parseFloat(b[column]);
-
-        let aVal, bVal;
-        if (!isNaN(aNum) && !isNaN(bNum)) {
-            aVal = aNum;
-            bVal = bNum;
-            return direction === 'asc' ? aVal - bVal : bVal - aVal;
-        } else {
-            aVal = String(a[column] || '').toLowerCase();
-            bVal = String(b[column] || '').toLowerCase();
-            return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-        }
+      const aRaw = a[column];
+      const bRaw = b[column];
+    
+      // Detect date columns by name
+      const isDateCol = (
+        column === 'endDate' ||
+        /date$/i.test(column) ||
+        /_date$/i.test(column)
+      );
+    
+      // Date sort
+      if (isDateCol) {
+        const aTime = parseDateToTime(aRaw);
+        const bTime = parseDateToTime(bRaw);
+    
+        // push invalid/missing dates to the bottom
+        if (aTime === null && bTime === null) return 0;
+        if (aTime === null) return 1;
+        if (bTime === null) return -1;
+    
+        return direction === 'asc' ? (aTime - bTime) : (bTime - aTime);
+      }
+    
+      // Numeric sort (only if both parse cleanly as numbers)
+      const aNum = parseFloat(aRaw);
+      const bNum = parseFloat(bRaw);
+      const aNumOk = aRaw !== null && aRaw !== undefined && aRaw !== '' && !isNaN(aNum);
+      const bNumOk = bRaw !== null && bRaw !== undefined && bRaw !== '' && !isNaN(bNum);
+    
+      if (aNumOk && bNumOk) {
+        return direction === 'asc' ? (aNum - bNum) : (bNum - aNum);
+      }
+    
+      // Text sort fallback
+      const aVal = String(aRaw || '').toLowerCase();
+      const bVal = String(bRaw || '').toLowerCase();
+      return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
+
 
     loadTableData(filteredData, false);
     updateSortIndicators(column, direction);
