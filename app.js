@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         setupChat();
-        setupApiKeyInput();
+        //setupApiKeyInput();
     } catch (error) {
         console.error('Error initializing page:', error);
         const tableBody = document.getElementById('tableBody');
@@ -1040,10 +1040,27 @@ function setupChat() {
     }
 }
 
-// ============================================================
-// YOUR EXISTING OpenAI / file_search code goes here
-// ============================================================
+
 async function callChatGPTAPI(userMessage) {
-    // You’ll replace this later with a Wix backend endpoint (recommended).
-    return `callChatGPTAPI not pasted. User asked: ${userMessage}`;
+  // IMPORTANT: send filteredData (or a slice) so answers match what user is looking at.
+  // Keep it reasonably sized.
+  const payload = {
+    message: userMessage,
+    data: filteredData.slice(0, 250) // adjust as needed; backend samples further
+  };
+
+  const resp = await fetch("https://allworldgolf.com/_functions/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const json = await resp.json().catch(() => ({}));
+
+  if (!resp.ok) {
+    throw new Error(json?.error || `Chat endpoint failed (${resp.status})`);
+  }
+
+  return json.answer || "No response returned.";
 }
+
