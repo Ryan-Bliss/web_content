@@ -69,7 +69,7 @@ function setHeadersFromData(data) {
   // 2) everything else alphabetical
   const rest = keys
     .filter(k => !ordered.includes(k))
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
   csvHeaders = [...ordered, ...rest];
 }
