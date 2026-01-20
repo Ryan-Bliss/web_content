@@ -42,53 +42,55 @@ function normalizeWixItems(items) {
 }
 
 function smartStatSort(a, b) {
-  // Group & order fields like: drivingAccuracyPercentageLast4, Last12, Last24, Last50, Last100
   const pa = parseLastMetric(a);
   const pb = parseLastMetric(b);
 
-  // If both are "...Last<number>" metrics, group by base then sort by number
+  // If both are "...Last<number>" metrics:
   if (pa.isLastMetric && pb.isLastMetric) {
-    const baseCmp = pa.base.localeCompare(pb.base);
+    // 1) group by base metric
+    const baseCmp = pa.base.localeCompare(pb.base, undefined, { sensitivity: 'base' });
     if (baseCmp !== 0) return baseCmp;
 
-    // same base metric -> sort by last number ascending
+    // 2) same base -> sort last number ASCENDING
     if (pa.lastNum !== pb.lastNum) return pa.lastNum - pb.lastNum;
 
-    // tie-breaker
+    // 3) tie-breaker
     return naturalCompare(a, b);
   }
 
-  // If only one is a Last metric, you can choose whether they come first or just normal
-  // Here: keep non-last and last mixed alphabetically by base name (more predictable overall)
-  // If you want Last-metrics grouped after non-last fields, change return values below.
+  // If only one is a Last metric: compare using its base to keep it near related fields
   if (pa.isLastMetric && !pb.isLastMetric) {
-    // compare base vs full b (so metrics don't jump wildly)
-    const baseCmp = pa.base.localeCompare(pb.base);
-    return baseCmp !== 0 ? baseCmp : -1;
-  }
-  if (!pa.isLastMetric && pb.isLastMetric) {
-    const baseCmp = a.localeCompare(pb.base);
+    const baseCmp = pa.base.localeCompare(pb.base, undefined, { sensitivity: 'base' });
     return baseCmp !== 0 ? baseCmp : 1;
   }
+  if (!pa.isLastMetric && pb.isLastMetric) {
+    const baseCmp = pa.base.localeCompare(pb.base, undefined, { sensitivity: 'base' });
+    return baseCmp !== 0 ? baseCmp : -1;
+  }
 
-  // Neither is a Last metric -> natural sort (handles numbers embedded anywhere)
+  // Neither is Last metric -> natural sort
   return naturalCompare(a, b);
 }
 
 function parseLastMetric(fieldName) {
-  // Matches "...Last4", "...Last12", "...Last100" (case-insensitive)
-  const m = fieldName.match(/^(.*)last(\d+)$/i);
+  // Robust match for variants like:
+  // approachesFrom100125YardsLast4
+  // approachesFrom100125YardsLAST100
+  // approachesFrom100125YardsLast_100
+  // approachesFrom100125YardsLast-100
+  //
+  // Captures the final "Last" segment + number at end of string.
+  const m = fieldName.match(/^(.*?)(?:last)[_\- ]?(\d+)\s*$/i);
   if (!m) return { isLastMetric: false, base: fieldName, lastNum: Number.POSITIVE_INFINITY };
 
   return {
     isLastMetric: true,
-    base: m[1],                 // everything before "Last###"
+    base: m[1],                 // everything before last###
     lastNum: parseInt(m[2], 10) // numeric
   };
 }
 
 function naturalCompare(a, b) {
-  // Natural sort: "foo2" < "foo10"
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
 
