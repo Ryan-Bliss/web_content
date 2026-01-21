@@ -944,3 +944,9 @@ html, body {
   table { min-width: 1000px; }     /* a bit wider so it scrolls nicely */
   th, td { font-size: 0.8em; }
 }
+
+/* Preserve newlines/spacing in chat responses */
+.bot-message .message-content {
+  white-space: pre-wrap;
+}
+
