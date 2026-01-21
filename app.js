@@ -170,56 +170,107 @@ async function loadWixImport731Data() {
 // ============================================================
 // Load CSV Data (fallback)
 // ============================================================
+// ============================================================
+// Load Data (Wix -> CSV -> Demo fallback)
+// ============================================================
 async function loadCSVData() {
-    try {
-        const response = await fetch('awg_llm_test_data.csv');
+  // 1) Try Wix HTTP Function first
+  try {
+    const wixUrl = `https://allworldgolf.com/_functions/import731?limit=1000&_ts=${Date.now()}`;
+    const resp = await fetch(wixUrl, { method: "GET" });
 
-        if (!response.ok) {
-            throw new Error(`CSV file not found (${response.status}). Please copy awg_llm_test_data.csv to the project folder or use a local server.`);
-        }
-
-        const csvText = await response.text();
-        console.log('CSV text loaded, length:', csvText.length);
-
-        const lines = csvText.split('\n').filter(line => line.trim());
-        if (lines.length === 0) {
-            console.warn('CSV file is empty');
-            return [];
-        }
-
-        const headers = parseCSVLine(lines[0]);
-        csvHeaders = headers.map(h => h.trim());
-        console.log('Parsed headers:', csvHeaders.length, 'columns');
-
-        const data = [];
-        for (let i = 1; i < lines.length; i++) {
-            const values = parseCSVLine(lines[i]);
-            if (values.length === headers.length) {
-                const row = {};
-                headers.forEach((header, index) => {
-                    row[header.trim()] = values[index]?.trim() || '';
-                });
-                row._id = i.toString();
-                data.push(row);
-            }
-        }
-
-        console.log('Parsed', data.length, 'rows');
-        return data;
-    } catch (error) {
-        console.error('Error loading CSV:', error);
-        console.log('Using fallback data...');
-
-        csvHeaders = ['endDate', 'T_ID', 'trnName', 'year', 'plrNum', 'plrName', 'FinalPosition', 'TournPurse',
-            'Driving Distance - Last4', 'Driving Accuracy Percentage - Last4', 'SG: Off the Tee - Last4'];
-
-        return [
-            { _id: '1', endDate: '2025-08-24', T_ID: 'R2025060', plrName: 'Tommy Fleetwood', trnName: 'TOUR Championship', FinalPosition: '1', TournPurse: '40000000', year: '2025', plrNum: '30911' },
-            { _id: '2', endDate: '2025-08-24', T_ID: 'R2025060', plrName: 'Patrick Cantlay', trnName: 'TOUR Championship', FinalPosition: '2', TournPurse: '40000000', year: '2025', plrNum: '35450' },
-            { _id: '3', endDate: '2025-08-24', T_ID: 'R2025060', plrName: 'Russell Henley', trnName: 'TOUR Championship', FinalPosition: '3', TournPurse: '40000000', year: '2025', plrNum: '34098' },
-        ];
+    if (!resp.ok) {
+      throw new Error(`Wix import731 failed (${resp.status})`);
     }
+
+    const json = await resp.json();
+
+    // Support common shapes: array OR { items: [...] } OR { data: [...] }
+    const items =
+      Array.isArray(json) ? json :
+      Array.isArray(json?.items) ? json.items :
+      Array.isArray(json?.data) ? json.data :
+      [];
+
+    if (!items.length) {
+      throw new Error("Wix import731 returned 0 rows");
+    }
+
+    // Build headers dynamically, but exclude Wix system fields
+    const systemFields = new Set([
+      "_id", "_owner", "_createdDate", "_updatedDate",
+      "_publishStatus", "_draft", "_removed"
+    ]);
+
+    const keys = new Set();
+    items.forEach(row => {
+      Object.keys(row || {}).forEach(k => {
+        if (!systemFields.has(k)) keys.add(k);
+      });
+    });
+
+    csvHeaders = Array.from(keys);
+
+    // Ensure each row has a stable _id (your table code expects _id sometimes)
+    const normalized = items.map((r, idx) => ({
+      _id: r?._id ?? String(idx + 1),
+      ...r
+    }));
+
+    console.log("Loaded from Wix Import731:", normalized.length, "rows");
+    console.log("Headers:", csvHeaders);
+
+    return normalized;
+  } catch (err) {
+    console.warn("Wix load failed, falling back to CSV/demo:", err);
+  }
+
+  // 2) Try CSV (if you add it back later)
+  try {
+    const response = await fetch("awg_llm_test_data.csv");
+    if (!response.ok) {
+      throw new Error(`CSV file not found (${response.status})`);
+    }
+
+    const csvText = await response.text();
+    const lines = csvText.split("\n").filter(line => line.trim());
+    if (!lines.length) throw new Error("CSV empty");
+
+    const headers = parseCSVLine(lines[0]);
+    csvHeaders = headers.map(h => h.trim());
+
+    const data = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]);
+      if (values.length === headers.length) {
+        const row = {};
+        headers.forEach((header, index) => {
+          row[header.trim()] = values[index]?.trim() || "";
+        });
+        row._id = i.toString();
+        data.push(row);
+      }
+    }
+
+    console.log("Loaded from CSV:", data.length, "rows");
+    return data;
+  } catch (err) {
+    console.warn("CSV load failed, using demo rows:", err);
+  }
+
+  // 3) Last resort demo rows
+  csvHeaders = [
+    "endDate", "T_ID", "trnName", "year", "plrNum", "plrName",
+    "FinalPosition", "TournPurse"
+  ];
+
+  return [
+    { _id: "1", endDate: "2025-08-24", T_ID: "R2025060", plrName: "Tommy Fleetwood", trnName: "TOUR Championship", FinalPosition: "1", TournPurse: "40000000", year: "2025", plrNum: "30911" },
+    { _id: "2", endDate: "2025-08-24", T_ID: "R2025060", plrName: "Patrick Cantlay", trnName: "TOUR Championship", FinalPosition: "2", TournPurse: "40000000", year: "2025", plrNum: "35450" },
+    { _id: "3", endDate: "2025-08-24", T_ID: "R2025060", plrName: "Russell Henley", trnName: "TOUR Championship", FinalPosition: "3", TournPurse: "40000000", year: "2025", plrNum: "34098" }
+  ];
 }
+
 
 // ============================================================
 // Initialize the page
