@@ -1042,11 +1042,9 @@ function setupChat() {
 
 
 async function callChatGPTAPI(userMessage) {
-  // IMPORTANT: send filteredData (or a slice) so answers match what user is looking at.
-  // Keep it reasonably sized.
   const payload = {
     message: userMessage,
-    data: filteredData.slice(0, 250) // adjust as needed; backend samples further
+    data: filteredData.slice(0, 250) // send some rows; backend samples further
   };
 
   const resp = await fetch("https://allworldgolf.com/_functions/chat", {
@@ -1058,9 +1056,8 @@ async function callChatGPTAPI(userMessage) {
   const json = await resp.json().catch(() => ({}));
 
   if (!resp.ok) {
-    throw new Error(json?.error || `Chat endpoint failed (${resp.status})`);
+    throw new Error(json?.error || `Chat failed (${resp.status})`);
   }
 
   return json.answer || "No response returned.";
 }
-
