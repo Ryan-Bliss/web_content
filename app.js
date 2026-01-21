@@ -1042,22 +1042,29 @@ function setupChat() {
 
 
 async function callChatGPTAPI(userMessage) {
-  const payload = {
-    message: userMessage,
-    data: filteredData.slice(0, 250) // send some rows; backend samples further
-  };
+  // Use the data currently loaded into your table as the context
+  // IMPORTANT: keep it small so requests stay fast and within limits
+  const dataForChat = (filteredData?.length ? filteredData : originalData).slice(0, 120);
 
   const resp = await fetch("https://allworldgolf.com/_functions/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      message: userMessage,
+      data: dataForChat
+    })
   });
 
-  const json = await resp.json().catch(() => ({}));
-
+  // If Wix/OpenAI errors, show details
   if (!resp.ok) {
-    throw new Error(json?.error || `Chat failed (${resp.status})`);
+    const txt = await resp.text().catch(() => "");
+    throw new Error(`Chat endpoint failed (${resp.status}). ${txt}`);
   }
 
-  return json.answer || "No response returned.";
+  const json = await resp.json();
+
+  if (json?.answer) return json.answer;
+  if (json?.error) throw new Error(json.error);
+
+  throw new Error("Unexpected response from chat endpoint");
 }
