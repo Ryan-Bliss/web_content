@@ -887,3 +887,60 @@ tbody tr:last-child td {
         height: 10px;
     }
 }
+/* ============================================================
+   Mobile improvements
+   ============================================================ */
+
+/* Let Wix control the page background */
+html, body {
+  background: transparent !important;
+}
+
+/* On small screens, reduce padding + make cards flatter */
+@media (max-width: 768px) {
+  body { padding: 10px; }
+
+  .table-container,
+  .chat-container {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  /* Make chat shorter on mobile so table isn't pushed too far down */
+  .chat-container {
+    max-height: none;
+    min-height: 340px;
+  }
+
+  /* IMPORTANT: make the table feel like a scrollable "sheet" */
+  .table-wrapper {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    max-height: 60vh;              /* keep it usable */
+    border-radius: 10px;
+  }
+
+  /* Keep columns readable: don't force wrapping in table cells */
+  table {
+    min-width: 900px;              /* forces horizontal scroll instead of squish */
+    table-layout: auto;
+  }
+
+  th, td {
+    white-space: nowrap !important; /* prevents squished wrapped text */
+    font-size: 0.85em;
+  }
+
+  /* Make filter dropdown fit on phone screens */
+  .filter-dropdown {
+    max-width: calc(100vw - 24px);
+    min-width: min(280px, calc(100vw - 24px));
+  }
+}
+
+/* Even smaller phones */
+@media (max-width: 480px) {
+  table { min-width: 1000px; }     /* a bit wider so it scrolls nicely */
+  th, td { font-size: 0.8em; }
+}
