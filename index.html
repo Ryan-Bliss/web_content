@@ -1,82 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>Wix AI Chat Bot - Local Test</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+  <title>AWG Player Stats + AI Analyst</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
-    <div class="container">
-        <h1></h1>
-        
-        <!-- Vertical layout container (chat on top, table below) -->
-        <div class="main-content">
-            <!-- Collection Table -->
-            <div class="table-container">
-                <div class="table-header-controls">
-                    <h2>AWG Player Stats</h2>
-                    <button id="clearAllFiltersBtn" class="clear-all-filters-btn" title="Clear all filters">
-                        Clear All Filters
-                    </button>
-                </div>
-                <div class="table-loading" id="tableLoading">
-                    <div class="loading-spinner"></div>
-                    <p>Loading table data...</p>
-                </div>
-                <div class="table-wrapper" id="tableWrapper" style="display: none;">
-                    <table id="collectionTable">
-                        <thead>
-                            <tr>
-                                <!-- Headers will be generated dynamically from CSV -->
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <!-- Data will be loaded here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+  <div class="container">
+    <h1></h1>
 
-            <!-- Chat Window -->
-            <div class="chat-container">
-                <div class="chat-header">
-                    <h2>AI Analyst Chat</h2>
-                    <p>Interactive conversation about our data</p>
-                    <!--<div class="api-key-input" id="apiKeyContainer" style="display: none;">
-                        <input type="password" id="apiKeyInput" placeholder="Enter OpenAI API Key" />
-                        <button id="saveApiKey">Save</button>
-                    </div> 
-                    <button id="toggleApiKey" class="api-key-toggle" style="font-size: 0.8em; padding: 5px 10px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff; cursor: pointer;">Set API Key</button>
-                    -->
-                </div>
-                <div class="chat-messages" id="chatMessages">
-                    <div class="message bot-message">
-                        <div class="message-content">
-                            I can answer questions about player stats, trends, our calculated probabilities, and insights on our data. What would you like to know?
-                        </div>
-                    </div>
-                </div>
-                <div class="chat-input-container">
-                    <input 
-                        type="text" 
-                        id="chatInput" 
-                        placeholder="Type your question here..." 
-                        autocomplete="off"
-                    />
-                    <button id="sendButton">Send</button>
-                </div>
-            </div>
+    <div class="main-content">
+      <!-- Collection Table -->
+      <div class="table-container">
+        <div class="table-header-controls">
+          <h2>AWG Player Stats</h2>
+          <button id="clearAllFiltersBtn" class="clear-all-filters-btn" title="Clear all filters">
+            Clear All Filters
+          </button>
         </div>
-    </div>
 
-    <script src="app.js"></script>
-    <!-- 
-        IMPORTANT: For CSV loading to work:
-        1. Copy awg_llm_test_data.csv from Downloads to this project folder
-        2. OR use a local server: python -m http.server 8000 (then open http://localhost:8000)
-        3. File:// protocol has CORS restrictions, so a local server is recommended
-    -->
+        <div class="table-loading" id="tableLoading">
+          <div class="loading-spinner"></div>
+          <p>Loading table data...</p>
+        </div>
+
+        <div class="table-wrapper" id="tableWrapper" style="display: none;">
+          <table id="collectionTable">
+            <thead>
+              <tr>
+                <!-- Headers generated dynamically -->
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Chat Window -->
+      <div class="chat-container">
+        <div class="chat-header">
+          <h2>AI Analyst Chat</h2>
+          <p>Ask any questions about the AWG player stats below</p>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+          <div class="message bot-message">
+            <div class="message-content">
+              Hello! Ask me anything about the table — trends, players improving, comparisons, etc.
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-container">
+          <input
+            type="text"
+            id="chatInput"
+            placeholder="Type your question here..."
+            autocomplete="off"
+          />
+          <button id="sendButton">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Markdown renderer + sanitizer (must be loaded BEFORE app.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+
+  <script src="app.js"></script>
 </body>
 </html>
-
