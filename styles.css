@@ -1025,3 +1025,47 @@ html, body {
   background: rgba(255,255,255,0.03);
 }
 
+/* Hard constrain chat bubbles so wide content can't stretch them */
+.message-content {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Make the bot bubble never overflow its container */
+.bot-message {
+  min-width: 0;
+}
+
+.bot-message .message-content {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;      /* key: bubble clips, inner wrapper scrolls */
+}
+
+/* Our wrapper that scrolls tables horizontally */
+.bot-message .message-content .table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  margin: 10px 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  padding-bottom: 6px; /* space for scrollbar */
+}
+
+/* Ensure table keeps its natural width and scrolls inside wrapper */
+.bot-message .message-content .table-scroll table {
+  width: max-content;   /* this is the secret sauce */
+  max-width: none;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+
+/* Optional: keep cells readable */
+.bot-message .message-content .table-scroll th,
+.bot-message .message-content .table-scroll td {
+  white-space: nowrap;
+}
+
