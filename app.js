@@ -12,7 +12,27 @@ const preferredFrontColumns = [
   "endDate",
   "trnName",
   "year",
-  "plrName",
+  "plrName",if (isLoading) {
+  contentDiv.innerHTML = '<span class="loading"></span>';
+} else {
+  if (sender === 'bot') {
+    // If you're already using a markdown renderer, keep that part.
+    // The key change is: wrap any <table> in a scroll container.
+
+    // If contentDiv.innerHTML is being set from markdown HTML:
+    contentDiv.innerHTML = text;
+
+    // Wrap tables for horizontal scrolling inside the bubble
+    contentDiv.querySelectorAll('table').forEach(tbl => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'table-scroll';
+      tbl.parentNode.insertBefore(wrapper, tbl);
+      wrapper.appendChild(tbl);
+    });
+  } else {
+    contentDiv.textContent = text;
+  }
+}
   "FinalPosition",
   "TournPurse",
   "FIELDSIZE"
@@ -902,16 +922,35 @@ function setupChat() {
 
     const contentDiv = document.createElement("div");
     contentDiv.className = "message-content";
-
+    
     if (isLoading) {
       contentDiv.innerHTML = '<span class="loading"></span>';
     } else {
-      if (sender === "bot") {
-        contentDiv.innerHTML = renderBotMessage(text);
+      if (sender === 'bot') {
+        // Render markdown HTML (you already added marked + DOMPurify earlier)
+        const rawHtml = typeof marked !== 'undefined'
+          ? marked.parse(text || '')
+          : (text || '').replace(/\n/g, '<br>');
+    
+        const safeHtml = typeof DOMPurify !== 'undefined'
+          ? DOMPurify.sanitize(rawHtml)
+          : rawHtml;
+    
+        contentDiv.innerHTML = safeHtml;
+    
+        // 🔑 WRAP ANY TABLES so they scroll inside the chat bubble
+        contentDiv.querySelectorAll('table').forEach(table => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'table-scroll';
+          table.parentNode.insertBefore(wrapper, table);
+          wrapper.appendChild(table);
+        });
       } else {
+        // User messages stay plain text
         contentDiv.textContent = text;
       }
     }
+
 
     messageDiv.appendChild(contentDiv);
     chatMessages.appendChild(messageDiv);
