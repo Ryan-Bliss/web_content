@@ -917,18 +917,18 @@ html, body {
     -webkit-overflow-scrolling: touch;
     overflow-x: auto !important;
     overflow-y: auto !important;
-    max-height: 60vh;              /* keep it usable */
+    max-height: 60vh;
     border-radius: 10px;
   }
 
-  /* Keep columns readable: don't force wrapping in table cells */
+  /* Keep the BIG table readable on phones: scroll instead of squish */
   table {
-    min-width: 900px;              /* forces horizontal scroll instead of squish */
+    min-width: 900px;
     table-layout: auto;
   }
 
   th, td {
-    white-space: nowrap !important; /* prevents squished wrapped text */
+    white-space: nowrap !important;
     font-size: 0.85em;
   }
 
@@ -941,28 +941,34 @@ html, body {
 
 /* Even smaller phones */
 @media (max-width: 480px) {
-  table { min-width: 1000px; }     /* a bit wider so it scrolls nicely */
+  table { min-width: 1000px; }
   th, td { font-size: 0.8em; }
 }
 
-/* Markdown formatting inside bot messages */
+/* ============================================================
+   Bot message formatting (Markdown)
+   ============================================================ */
+
+/* Keep bubbles from stretching due to wide content */
+.message-content {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.bot-message {
+  min-width: 0;
+}
+
 .bot-message .message-content {
-  white-space: normal;   /* let markdown produce HTML */
-}
-
-.bot-message .message-content table {
   width: 100%;
-  border-collapse: collapse;
-  margin: 10px 0;
-  font-size: 0.9em;
+  max-width: 100%;
+  overflow: hidden;     /* bubble clips; inner wrappers handle scroll */
+  white-space: normal;  /* allow markdown HTML to wrap normally */
 }
 
-.bot-message .message-content th,
-.bot-message .message-content td {
-  border: 1px solid rgba(255,255,255,0.15);
-  padding: 8px;
-  text-align: left;
-  vertical-align: top;
+/* Inline code + code blocks */
+.bot-message .message-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .bot-message .message-content pre {
@@ -972,78 +978,11 @@ html, body {
   background: rgba(0,0,0,0.25);
 }
 
-.bot-message .message-content code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
+/* ============================================================
+   Chat tables (Markdown) — scroll inside bubble + aligned header/body
+   Requires app.js wrapping tables in: <div class="table-scroll">...</div>
+   ============================================================ */
 
-/* Ensure bot message bubbles constrain wide content */
-.bot-message .message-content {
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-/* Make markdown tables scroll INSIDE the chat bubble */
-.bot-message .message-content table {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  white-space: nowrap;
-  border-collapse: collapse;
-}
-
-/* Wrap table in a visual container */
-.bot-message .message-content table thead,
-.bot-message .message-content table tbody {
-  display: table;
-  width: 100%;
-  table-layout: auto;
-}
-
-/* Optional: slightly smaller table text inside chat */
-.bot-message .message-content table {
-  font-size: 0.85em;
-}
-
-/* Add subtle horizontal scroll indicator */
-.bot-message .message-content table::-webkit-scrollbar {
-  height: 6px;
-}
-
-.bot-message .message-content table::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.25);
-  border-radius: 6px;
-}
-
-.bot-message .message-content table::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.bot-message .message-content table {
-  margin: 10px 0;
-  padding-bottom: 6px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.03);
-}
-
-/* Hard constrain chat bubbles so wide content can't stretch them */
-.message-content {
-  max-width: 100%;
-  min-width: 0;
-}
-
-/* Make the bot bubble never overflow its container */
-.bot-message {
-  min-width: 0;
-}
-
-.bot-message .message-content {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;      /* key: bubble clips, inner wrapper scrolls */
-}
-
-/* Our wrapper that scrolls tables horizontally */
 .bot-message .message-content .table-scroll {
   max-width: 100%;
   overflow-x: auto;
@@ -1055,26 +994,38 @@ html, body {
   padding-bottom: 6px; /* space for scrollbar */
 }
 
-/* Ensure table keeps its natural width and scrolls inside wrapper */
+/* Restore real table behavior so columns align */
 .bot-message .message-content .table-scroll table {
-  width: max-content;   /* this is the secret sauce */
+  display: table !important;
+  width: max-content !important;  /* keep natural width; wrapper scrolls */
   max-width: none;
   border-collapse: collapse;
+  table-layout: auto !important;
   font-size: 0.85em;
 }
 
-/* Optional: keep cells readable */
+/* Make sure browser uses native table groups (prevents header drift) */
+.bot-message .message-content .table-scroll thead { display: table-header-group !important; }
+.bot-message .message-content .table-scroll tbody { display: table-row-group !important; }
+.bot-message .message-content .table-scroll tr    { display: table-row !important; }
+
 .bot-message .message-content .table-scroll th,
 .bot-message .message-content .table-scroll td {
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
   white-space: nowrap;
 }
 
-.table-scroll {
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+/* Optional: nicer horizontal scrollbar for chat tables */
+.bot-message .message-content .table-scroll::-webkit-scrollbar {
+  height: 6px;
 }
-
-.table-scroll table {
-  min-width: max-content;
+.bot-message .message-content .table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+}
+.bot-message .message-content .table-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
 }
