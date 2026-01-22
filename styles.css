@@ -1069,3 +1069,12 @@ html, body {
   white-space: nowrap;
 }
 
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll table {
+  min-width: max-content;
+}
