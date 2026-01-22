@@ -846,7 +846,6 @@ function renderBotMessage(markdownText) {
   const html = marked.parse(raw);
   return hasPurify ? DOMPurify.sanitize(html) : html;
 }
-
 function setupChat() {
   const chatInput = document.getElementById("chatInput");
   const sendButton = document.getElementById("sendButton");
@@ -906,7 +905,6 @@ function setupChat() {
       // Wrap tables so they scroll inside the bubble
       contentDiv.querySelectorAll("table").forEach((tbl) => {
         if (tbl.parentElement && tbl.parentElement.classList.contains("table-scroll")) return;
-
         const wrapper = document.createElement("div");
         wrapper.className = "table-scroll";
         tbl.parentNode.insertBefore(wrapper, tbl);
@@ -920,9 +918,9 @@ function setupChat() {
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
-    return messageDiv; // IMPORTANT: return the element so .remove() works
+    return messageDiv; // return ELEMENT so .remove() works
   }
-}
+} // ✅ IMPORTANT: this closing brace was missing in your file
 
 // Call your Wix backend chat function
 async function callChatGPTAPI(userMessage, tableData) {
@@ -946,13 +944,11 @@ async function callChatGPTAPI(userMessage, tableData) {
     throw new Error(`Chat endpoint returned non-JSON: ${text?.slice(0, 200) || ""}`);
   }
 
-  // Support both shapes:
-  // - your current backend: { answer: "..." }
-  // - older version: { success: true, response: "..." }
-  const answer = json.answer ?? json.response ?? "";
-  if (!answer) {
-    throw new Error("Unexpected response from chat endpoint");
-  }
+  // Your backend currently returns: { success: true, response: "..." }
+  // Older versions returned: { answer: "..." }
+  const answer = json.response ?? json.answer ?? "";
+  if (!answer) throw new Error("Unexpected response from chat endpoint");
 
   return answer;
 }
+
