@@ -945,8 +945,5 @@ html, body {
   th, td { font-size: 0.8em; }
 }
 
-/* Preserve newlines/spacing in chat responses */
-.bot-message .message-content {
-  white-space: pre-wrap;
-}
+
 
