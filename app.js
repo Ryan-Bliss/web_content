@@ -916,48 +916,66 @@ function setupChat() {
     }
   }
 
-  function addMessage(text, sender, isLoading = false) {
-    const messageDiv = document.createElement("div");
-    messageDiv.className = `message ${sender}-message`;
+function addMessage(text, sender, isLoading = false) {
+  const messageId = `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-    const contentDiv = document.createElement("div");
-    contentDiv.className = "message-content";
-    
-    if (isLoading) {
-      contentDiv.innerHTML = '<span class="loading"></span>';
-    } else {
-      if (sender === 'bot') {
-        // Render markdown HTML (you already added marked + DOMPurify earlier)
-        const rawHtml = typeof marked !== 'undefined'
-          ? marked.parse(text || '')
-          : (text || '').replace(/\n/g, '<br>');
-    
-        const safeHtml = typeof DOMPurify !== 'undefined'
-          ? DOMPurify.sanitize(rawHtml)
-          : rawHtml;
-    
-        contentDiv.innerHTML = safeHtml;
-    
-        // 🔑 WRAP ANY TABLES so they scroll inside the chat bubble
-        contentDiv.querySelectorAll('table').forEach(table => {
-          const wrapper = document.createElement('div');
-          wrapper.className = 'table-scroll';
-          table.parentNode.insertBefore(wrapper, table);
-          wrapper.appendChild(table);
-        });
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message ${sender}-message`;
+  messageDiv.setAttribute('data-message-id', messageId);
+
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'message-content';
+
+  if (isLoading) {
+    contentDiv.innerHTML = '<span class="loading"></span>';
+  } else if (sender === 'bot') {
+    // Markdown -> HTML (fallback to <br> if libs missing)
+    let html;
+    try {
+      if (window.marked && typeof window.marked.parse === 'function') {
+        html = window.marked.parse(text || "");
       } else {
-        // User messages stay plain text
-        contentDiv.textContent = text;
+        html = escapeHtml(text || "").replace(/\n/g, "<br>");
       }
+    } catch (e) {
+      html = escapeHtml(text || "").replace(/\n/g, "<br>");
     }
 
+    // Sanitize if available
+    try {
+      if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+        html = window.DOMPurify.sanitize(html);
+      }
+    } catch (e) {
+      // ignore sanitize errors, still render
+    }
 
-    messageDiv.appendChild(contentDiv);
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    contentDiv.innerHTML = html;
 
-    return messageDiv;
+    // Wrap any markdown tables so they scroll inside the bubble
+    const tables = contentDiv.querySelectorAll('table');
+    tables.forEach((table) => {
+      try {
+        if (table.parentElement && table.parentElement.classList.contains('table-scroll')) return;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'table-scroll';
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
+      } catch (e) {
+        // ignore wrapping errors
+      }
+    });
+
+  } else {
+    // user message stays plain text
+    contentDiv.textContent = text || "";
   }
+
+  messageDiv.appendChild(contentDiv);
+  chatMessages.appendChild(messageDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  return messageId;
 }
 
 // Call your Wix backend chat function (which calls OpenAI with your secret key)
