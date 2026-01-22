@@ -976,4 +976,52 @@ html, body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* Ensure bot message bubbles constrain wide content */
+.bot-message .message-content {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Make markdown tables scroll INSIDE the chat bubble */
+.bot-message .message-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+  border-collapse: collapse;
+}
+
+/* Wrap table in a visual container */
+.bot-message .message-content table thead,
+.bot-message .message-content table tbody {
+  display: table;
+  width: 100%;
+  table-layout: auto;
+}
+
+/* Optional: slightly smaller table text inside chat */
+.bot-message .message-content table {
+  font-size: 0.85em;
+}
+
+/* Add subtle horizontal scroll indicator */
+.bot-message .message-content table::-webkit-scrollbar {
+  height: 6px;
+}
+
+.bot-message .message-content table::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+}
+
+.bot-message .message-content table::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bot-message .message-content table {
+  margin: 10px 0;
+  padding-bottom: 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+}
 
