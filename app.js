@@ -12,27 +12,7 @@ const preferredFrontColumns = [
   "endDate",
   "trnName",
   "year",
-  "plrName",if (isLoading) {
-  contentDiv.innerHTML = '<span class="loading"></span>';
-} else {
-  if (sender === 'bot') {
-    // If you're already using a markdown renderer, keep that part.
-    // The key change is: wrap any <table> in a scroll container.
-
-    // If contentDiv.innerHTML is being set from markdown HTML:
-    contentDiv.innerHTML = text;
-
-    // Wrap tables for horizontal scrolling inside the bubble
-    contentDiv.querySelectorAll('table').forEach(tbl => {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'table-scroll';
-      tbl.parentNode.insertBefore(wrapper, tbl);
-      wrapper.appendChild(tbl);
-    });
-  } else {
-    contentDiv.textContent = text;
-  }
-}
+  "plrName",
   "FinalPosition",
   "TournPurse",
   "FIELDSIZE"
@@ -44,6 +24,7 @@ const hiddenColumns = new Set(["_id", "id"]);
 // ============================================================
 // GLOBAL STATE
 // ============================================================
+
 let mockCollectionData = [];
 let originalData = [];
 let filteredData = [];
@@ -842,7 +823,7 @@ function updateClearAllButtonVisibility() {
 }
 
 // ============================================================
-// CHAT (Markdown rendering)
+// CHAT (Markdown rendering + table wrapper)
 // ============================================================
 
 // Convert markdown -> HTML, sanitize output
@@ -853,21 +834,17 @@ function renderBotMessage(markdownText) {
   const hasPurify = typeof DOMPurify !== "undefined";
 
   if (!hasMarked) {
-    // fallback: basic newline preservation
     const safe = raw.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return safe.replace(/\n/g, "<br>");
   }
 
-  // marked settings (optional but helps tables)
   marked.setOptions({
     gfm: true,
     breaks: true
   });
 
   const html = marked.parse(raw);
-
-  if (hasPurify) return DOMPurify.sanitize(html);
-  return html;
+  return hasPurify ? DOMPurify.sanitize(html) : html;
 }
 
 function setupChat() {
@@ -895,20 +872,18 @@ function setupChat() {
     addMessage(userMessage, "user");
     chatInput.value = "";
 
-    const loadingMessage = addMessage("", "bot", true);
+    const loadingEl = addMessage("", "bot", true);
 
     try {
-      // Send a smaller slice for performance if needed
-      // (You can tune this later)
       const dataToSend = filteredData.slice(0, 1000);
-
       const responseText = await callChatGPTAPI(userMessage, dataToSend);
 
-      loadingMessage.remove();
+      loadingEl.remove();
       addMessage(responseText, "bot");
     } catch (error) {
-      loadingMessage.remove();
+      loadingEl.remove();
       addMessage(`Sorry, I encountered an error: ${error.message || error}`, "bot");
+      console.error("Chat error:", error);
     } finally {
       chatInput.disabled = false;
       sendButton.disabled = false;
@@ -916,76 +891,45 @@ function setupChat() {
     }
   }
 
-function addMessage(text, sender, isLoading = false) {
-  const messageId = `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  function addMessage(text, sender, isLoading = false) {
+    const messageDiv = document.createElement("div");
+    messageDiv.className = `message ${sender}-message`;
 
-  const messageDiv = document.createElement('div');
-  messageDiv.className = `message ${sender}-message`;
-  messageDiv.setAttribute('data-message-id', messageId);
+    const contentDiv = document.createElement("div");
+    contentDiv.className = "message-content";
 
-  const contentDiv = document.createElement('div');
-  contentDiv.className = 'message-content';
+    if (isLoading) {
+      contentDiv.innerHTML = '<span class="loading"></span>';
+    } else if (sender === "bot") {
+      contentDiv.innerHTML = renderBotMessage(text);
 
-  if (isLoading) {
-    contentDiv.innerHTML = '<span class="loading"></span>';
-  } else if (sender === 'bot') {
-    // Markdown -> HTML (fallback to <br> if libs missing)
-    let html;
-    try {
-      if (window.marked && typeof window.marked.parse === 'function') {
-        html = window.marked.parse(text || "");
-      } else {
-        html = escapeHtml(text || "").replace(/\n/g, "<br>");
-      }
-    } catch (e) {
-      html = escapeHtml(text || "").replace(/\n/g, "<br>");
+      // Wrap tables so they scroll inside the bubble
+      contentDiv.querySelectorAll("table").forEach((tbl) => {
+        if (tbl.parentElement && tbl.parentElement.classList.contains("table-scroll")) return;
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "table-scroll";
+        tbl.parentNode.insertBefore(wrapper, tbl);
+        wrapper.appendChild(tbl);
+      });
+    } else {
+      contentDiv.textContent = text || "";
     }
 
-    // Sanitize if available
-    try {
-      if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
-        html = window.DOMPurify.sanitize(html);
-      }
-    } catch (e) {
-      // ignore sanitize errors, still render
-    }
+    messageDiv.appendChild(contentDiv);
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 
-    contentDiv.innerHTML = html;
-
-    // Wrap any markdown tables so they scroll inside the bubble
-    const tables = contentDiv.querySelectorAll('table');
-    tables.forEach((table) => {
-      try {
-        if (table.parentElement && table.parentElement.classList.contains('table-scroll')) return;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'table-scroll';
-        table.parentNode.insertBefore(wrapper, table);
-        wrapper.appendChild(table);
-      } catch (e) {
-        // ignore wrapping errors
-      }
-    });
-
-  } else {
-    // user message stays plain text
-    contentDiv.textContent = text || "";
+    return messageDiv; // IMPORTANT: return the element so .remove() works
   }
-
-  messageDiv.appendChild(contentDiv);
-  chatMessages.appendChild(messageDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-
-  return messageId;
 }
 
-// Call your Wix backend chat function (which calls OpenAI with your secret key)
+// Call your Wix backend chat function
 async function callChatGPTAPI(userMessage, tableData) {
   const res = await fetch(WIX_CHAT_URL, {
     method: "POST",
     mode: "cors",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       message: userMessage,
       data: tableData
@@ -998,14 +942,17 @@ async function callChatGPTAPI(userMessage, tableData) {
   if (!res.ok) {
     throw new Error(`Chat endpoint error: ${res.status} ${text?.slice(0, 200) || ""}`);
   }
-
   if (!json) {
     throw new Error(`Chat endpoint returned non-JSON: ${text?.slice(0, 200) || ""}`);
   }
 
-  if (!json.success) {
-    throw new Error(json.error || "Chat failed");
+  // Support both shapes:
+  // - your current backend: { answer: "..." }
+  // - older version: { success: true, response: "..." }
+  const answer = json.answer ?? json.response ?? "";
+  if (!answer) {
+    throw new Error("Unexpected response from chat endpoint");
   }
 
-  return json.response || "";
+  return answer;
 }
