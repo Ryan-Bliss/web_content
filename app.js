@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const WIX_IMPORT_URL = "https://allworldgolf.com/_functions/import731";
+const WIX_IMPORT_URL = "https://allworldgolf.com/_functions/import732";
 const WIX_CHAT_URL = "https://allworldgolf.com/_functions/chat";
 
 // Keep your current filterable columns for now (per your preference)
@@ -121,12 +121,12 @@ async function loadWixCollectionData(limit = 1000) {
   const json = safeJsonParse(text);
 
   if (!res.ok) {
-    throw new Error(`Import731 endpoint error: ${res.status} ${text?.slice(0, 200) || ""}`);
+    throw new Error(`Import732 endpoint error: ${res.status} ${text?.slice(0, 200) || ""}`);
   }
 
   if (!json || !Array.isArray(json.items)) {
     throw new Error(
-      `Import731 endpoint did not return JSON {items:[...]}. Got: ${text?.slice(0, 200) || ""}`
+      `Import732 endpoint did not return JSON {items:[...]}. Got: ${text?.slice(0, 200) || ""}`
     );
   }
 
@@ -846,6 +846,7 @@ function renderBotMessage(markdownText) {
   const html = marked.parse(raw);
   return hasPurify ? DOMPurify.sanitize(html) : html;
 }
+
 function setupChat() {
   const chatInput = document.getElementById("chatInput");
   const sendButton = document.getElementById("sendButton");
@@ -874,8 +875,9 @@ function setupChat() {
     const loadingEl = addMessage("", "bot", true);
 
     try {
-      const dataToSend = filteredData.slice(0, 1000);
-      const responseText = await callChatGPTAPI(userMessage, dataToSend);
+      // IMPORTANT: do NOT send table rows anymore.
+      // Send only the current UI filters + sort so backend can apply them to Import733.
+      const responseText = await callChatGPTAPI(userMessage, activeFilters, activeSort);
 
       loadingEl.remove();
       addMessage(responseText, "bot");
@@ -920,17 +922,19 @@ function setupChat() {
 
     return messageDiv; // return ELEMENT so .remove() works
   }
-} // ✅ IMPORTANT: this closing brace was missing in your file
+}
 
 // Call your Wix backend chat function
-async function callChatGPTAPI(userMessage, tableData) {
+async function callChatGPTAPI(userMessage, filters, sort) {
   const res = await fetch(WIX_CHAT_URL, {
     method: "POST",
     mode: "cors",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       message: userMessage,
-      data: tableData
+      filters: filters || {},
+      sort: sort || { column: null, direction: null },
+      limit: 400
     })
   });
 
@@ -944,11 +948,8 @@ async function callChatGPTAPI(userMessage, tableData) {
     throw new Error(`Chat endpoint returned non-JSON: ${text?.slice(0, 200) || ""}`);
   }
 
-  // Your backend currently returns: { success: true, response: "..." }
-  // Older versions returned: { answer: "..." }
   const answer = json.response ?? json.answer ?? "";
   if (!answer) throw new Error("Unexpected response from chat endpoint");
 
   return answer;
 }
-
