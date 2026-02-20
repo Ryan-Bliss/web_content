@@ -934,7 +934,7 @@ async function callChatGPTAPI(userMessage, filters, sort) {
       message: userMessage,
       filters: filters || {},
       sort: sort || { column: null, direction: null },
-      limit: 400
+      limit: 1000
     })
   });
 
