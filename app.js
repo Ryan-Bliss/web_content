@@ -1,8 +1,8 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const WIX_IMPORT_URL = "https://allworldgolf.com/_functions/import732";
-const WIX_CHAT_URL = "https://allworldgolf.com/_functions/chat";
+const WIX_IMPORT_URL = "https://www.allworldgolf.com/_functions/import732";
+const WIX_CHAT_URL   = "https://www.allworldgolf.com/_functions/chat";
 
 // Keep your current filterable columns for now (per your preference)
 const filterableColumns = ["endDate", "plrName", "trnName", "year", "FinalPosition", "TournPurse"];
