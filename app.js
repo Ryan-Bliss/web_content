@@ -9,14 +9,13 @@ const filterableColumns = ["endDate", "plrName", "trnName", "year", "FinalPositi
 
 // Preferred table column order (front of table)
 const preferredFrontColumns = [
-  "endDate",
-  "trnName",
-  "year",
-  "plrName",
-  "FinalPosition",
-  "TournPurse",
-  "FIELDSIZE"
+  "player_name",
+  "tournament_name",
+  "tournament_end_date",
+  "course_name",
+  "field_size"
 ];
+
 
 // Hide these if they show up
 const hiddenColumns = new Set(["_id", "id"]);
@@ -116,7 +115,6 @@ async function loadWixCollectionData(limit = 1000) {
 
   const res = await fetch(url, { method: "GET", mode: "cors" });
 
-  // Some Wix setups can return empty html on misconfig. We expect JSON.
   const text = await res.text();
   const json = safeJsonParse(text);
 
@@ -130,7 +128,11 @@ async function loadWixCollectionData(limit = 1000) {
     );
   }
 
-  return json.items;
+  // Return both items and headerOrder (if backend provides it)
+  return {
+    items: json.items,
+    headerOrder: Array.isArray(json.headerOrder) ? json.headerOrder : null
+  };
 }
 
 // ============================================================
@@ -142,8 +144,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Try Wix first (your real desired data)
     try {
-      mockCollectionData = await loadWixCollectionData(1000);
-      console.log("Wix data loaded:", mockCollectionData.length);
+      const wixPayload = await loadWixCollectionData(1000);
+      mockCollectionData = wixPayload.items;
+      window.__wixHeaderOrder = wixPayload.headerOrder; // optional debug
+      console.log("Wix data loaded:", mockCollectionData.length, "headerOrder:", wixPayload.headerOrder?.length || 0);
+
     } catch (e) {
       console.warn("Wix data load failed, falling back to demo rows:", e);
       mockCollectionData = [
@@ -157,14 +162,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       throw new Error("No data returned for table.");
     }
 
-    // Determine headers dynamically from the first row (plus union across rows as safety)
+    // Determine headers
     const headerSet = new Set();
     for (const row of mockCollectionData) {
       Object.keys(row || {}).forEach(k => headerSet.add(k));
     }
-
-    csvHeaders = sortHeadersSmart(Array.from(headerSet));
+    
+    const backendOrder = Array.isArray(window.__wixHeaderOrder)
+      ? window.__wixHeaderOrder.filter(h => headerSet.has(h)) // keep only real keys
+      : null;
+    
+    if (backendOrder && backendOrder.length) {
+      // Use backend order EXACTLY (it already has your "important columns first")
+      csvHeaders = backendOrder.filter(h => !hiddenColumns.has(h));
+    
+      // If you still want your smart "LastN grouping" AFTER the pinned front columns,
+      // uncomment the next line (it will keep preferredFrontColumns first):
+      // csvHeaders = sortHeadersSmart(csvHeaders);
+    
+    } else {
+      // Fallback: your existing behavior
+      csvHeaders = sortHeadersSmart(Array.from(headerSet));
+    }
+    
     console.log("Headers:", csvHeaders);
+
 
     // Clean rows: ensure every row has all headers (missing -> "")
     const normalized = mockCollectionData.map((row, idx) => {
